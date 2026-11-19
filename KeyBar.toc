@@ -1,0 +1,17 @@
+## Interface: 16001
+## Title: KeyBar
+## Notes: On-screen keyboard showing what every key does, per modifier layer.
+## Author: Giorgos Tritsarolis
+## Version: 0.1.0
+## SavedVariables: KeyBarDB
+
+Layouts.lua
+Skins.lua
+Bindings.lua
+Keycap.lua
+Keyboard.lua
+ControlsList.lua
+Setup.lua
+Spellbook.lua
+CharacterBinds.lua
+Core.lua
