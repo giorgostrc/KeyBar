@@ -4,14 +4,19 @@ local function Key(token, label, w, h)
     return { token = token, label = label or token, w = w or 1, h = h or 1 }
 end
 
+-- "CTRL" -> "Ctrl"
+function ns.ModifierLabel(modifier)
+    return modifier:sub(1, 1) .. modifier:sub(2):lower()
+end
+
 local function Modifier(token, modifier, w)
-    local key = Key(token, modifier:sub(1, 1) .. modifier:sub(2):lower(), w)
+    local key = Key(token, ns.ModifierLabel(modifier), w)
     key.modifier = modifier
     return key
 end
 
 local function Cosmetic(label, w)
-    return { label = label, w = w, h = 1 }
+    return Key(nil, label, w)
 end
 
 local function Gap(w)

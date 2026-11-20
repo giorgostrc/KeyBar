@@ -22,7 +22,7 @@ local function CollectGroups()
                 byHeader[header] = { header = header, entries = {} }
                 groups[#groups + 1] = byHeader[header]
             end
-            table.insert(byHeader[header].entries, { command = command, name = name })
+            table.insert(byHeader[header].entries, { command = command, name = name, searchName = name:lower() })
         end
     end
     return groups
@@ -135,7 +135,7 @@ function ControlsList:BuildElements()
     for _, group in ipairs(self.groups) do
         local matches = {}
         for _, entry in ipairs(group.entries) do
-            if query == "" or entry.name:lower():find(query, 1, true) then
+            if query == "" or entry.searchName:find(query, 1, true) then
                 matches[#matches + 1] = entry
             end
         end
@@ -153,7 +153,7 @@ function ControlsList:BuildElements()
 end
 
 function ControlsList:Refresh()
-    if not (self.panel and self.panel:IsShown()) then return end
+    if not self:IsShown() then return end
     local provider = CreateDataProvider(self:BuildElements())
     self.panel.ScrollBox:SetDataProvider(provider, ScrollBoxConstants.RetainScrollPosition)
 end

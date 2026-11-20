@@ -19,7 +19,7 @@ local DEFAULTS_CLEARED_PREFIXES = { "", "SHIFT-" }
 
 -- Spell, item, macro and click binds carry a payload ("SPELL Frostbolt"); controls are bare commands.
 local function IsCharacterBind(command)
-    return command:find("^%u+ ") ~= nil
+    return (ns.ParseCommand(command)) ~= nil
 end
 
 -- WoW's account set mixes in every character's spells, items and macros, so only its controls are kept.
@@ -57,12 +57,16 @@ local function LoadKeyBarDefaults()
     MoveBinding("STRAFERIGHT", "D")
 end
 
+function ns.SaveCharacterBindings()
+    SaveBindings(Enum.BindingSet.Character)
+end
+
 local CharacterBinds = { variablesLoaded = false, done = false }
 ns.CharacterBinds = CharacterBinds
 
 function CharacterBinds:Start(loadStartingBinds)
     loadStartingBinds()
-    SaveBindings(Enum.BindingSet.Character)
+    ns.SaveCharacterBindings()
     ns.db.setUpCharacters[UnitGUID("player")] = true
 end
 

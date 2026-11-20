@@ -82,7 +82,6 @@ function KeycapMixin:ApplySkin(skin)
     self:SetBackdropColor(unpack(skin.key.background))
     self.Art:GetNormalTexture():SetAlpha(skin.buttonArt and 1 or 0)
     self:UpdateBorder()
-    self:UpdateUsability()
 end
 
 function KeycapMixin:SetKeyDef(def, width, height)
@@ -94,9 +93,9 @@ function KeycapMixin:SetKeyDef(def, width, height)
     self:SetPressed(false)
 end
 
-function KeycapMixin:ShowBinding(bindKey, binding, isFallback)
+function KeycapMixin:ShowBinding(bindKey, binding, isFallback, modifierActive)
     self.bindKey, self.binding, self.isFallback = bindKey, binding, isFallback
-    self.modifierActive = false
+    self.modifierActive = modifierActive
     self:UpdateBorder()
 
     local icon = binding and (binding.icon or binding.atlas)
@@ -111,12 +110,12 @@ function KeycapMixin:ShowBinding(bindKey, binding, isFallback)
     self.CommandLabel:SetAlpha(isFallback and 0.45 or 1)
     self.Art:SetShown(icon ~= nil)
     self.RankLabel:SetText(icon and binding.rank and ("R" .. binding.rank) or "")
-    if not icon then return self:UpdateUsability() end
-
-    ns.SetIconArt(self.Art.icon, binding)
-    self.Art.icon:SetDesaturated(isFallback)
-    self.Art:SetAlpha(isFallback and 0.35 or 1)
-    self:UpdateCooldown()
+    if icon then
+        ns.SetIconArt(self.Art.icon, binding)
+        self.Art.icon:SetDesaturated(isFallback)
+        self.Art:SetAlpha(isFallback and 0.35 or 1)
+        self:UpdateCooldown()
+    end
     self:UpdateUsability()
 end
 
@@ -140,9 +139,7 @@ function KeycapMixin:FitCommandLabel(text)
 end
 
 function KeycapMixin:ShowModifier(active)
-    self:ShowBinding(nil, nil, false)
-    self.modifierActive = active
-    self:UpdateBorder()
+    self:ShowBinding(nil, nil, false, active)
 end
 
 function KeycapMixin:UpdateCooldown()

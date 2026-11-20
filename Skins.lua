@@ -7,7 +7,7 @@ local FLAT_KEY = {
 }
 
 -- Colors are { r, g, b, a }. Gold comes from tinting long-standing grey Blizzard borders.
-ns.SKINS = {
+local SKINS = {
     classic = {
         frame = {
             backdrop = {
@@ -87,7 +87,7 @@ ns.SKIN_OPTIONS = {
 }
 
 function ns.CurrentSkin()
-    return ns.SKINS[ns.db.skin]
+    return SKINS[ns.db.skin]
 end
 
 -- backgroundAlpha overrides the skin's background opacity, e.g. to keep a text list readable.

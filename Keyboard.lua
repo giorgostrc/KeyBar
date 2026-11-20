@@ -73,10 +73,6 @@ end
 function Keyboard:EnableKeyListener()
     self.KeyListener:SetPropagateKeyboardInput(true)
     self.KeyListener:EnableKeyboard(true)
-    self:EnsureKeysPropagate()
-end
-
-function Keyboard:EnsureKeysPropagate()
     if self.KeyListener:GetPropagateKeyboardInput() then return end
     self.KeyListener:EnableKeyboard(false)
     ns.Print("The client won't let KeyBar pass keys through, so key press highlights are off to keep your binds working.")
@@ -375,20 +371,10 @@ function Keyboard:Refresh()
             cap:ShowBinding(nil, nil, false)
         else
             local bindKey = prefix .. def.token
-            local binding = ns.ResolveBinding(bindKey)
-            local isFallback = not binding and prefix ~= ""
-            cap:ShowBinding(bindKey, binding or (isFallback and ns.ResolveBinding(def.token)) or nil, isFallback)
+            local effectiveKey, isFallback = ns.EffectiveKey(bindKey, def.token)
+            cap:ShowBinding(bindKey, ns.ResolveBinding(effectiveKey), isFallback)
         end
     end
-end
-
-function Keyboard:RequestRefresh()
-    if self.refreshPending or not self:IsShown() then return end
-    self.refreshPending = true
-    C_Timer.After(0, function()
-        self.refreshPending = false
-        self:Refresh()
-    end)
 end
 
 -- Range has no event that's safe to share with Blizzard's bars, so it's polled while the keyboard is visible.

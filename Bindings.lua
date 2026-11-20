@@ -155,7 +155,19 @@ local function IsSpellKnownByCharacter(spellID)
     return mountID ~= nil and select(11, C_MountJournal.GetMountInfoByID(mountID))
 end
 
--- Commands of the form "VERB payload", e.g. "SPELL Fireball", created by SetBindingSpell and friends.
+-- Returns (verb, payload) for commands made by SetBindingSpell and friends ("SPELL Fireball"),
+-- and (buttonPrefix, buttonIndex) for button commands ("ACTIONBUTTON3").
+function ns.ParseCommand(command)
+    local verb, payload = command:match("^(%u+) (.+)$")
+    local buttonPrefix, buttonIndex = command:match("^(.-BUTTON)(%d+)$")
+    return verb, payload, buttonPrefix, buttonIndex
+end
+
+-- A CLICK target reads "FrameName:MouseButton".
+local function ClickTargetButton(target)
+    return _G[target:match("^[^:]+")]
+end
+
 -- Spells the character doesn't know resolve to nil, so the key shows the spell's name as text.
 local PAYLOAD_RESOLVERS = {
     SPELL = function(spell)
@@ -174,7 +186,7 @@ local PAYLOAD_RESOLVERS = {
         return { kind = "macro", value = index, icon = icon }
     end,
     CLICK = function(target)
-        local button = _G[target:match("^[^:]+")]
+        local button = ClickTargetButton(target)
         return button and FromActionSlot(button.action)
     end,
 }
@@ -194,7 +206,7 @@ end
 function ns.LayerName(mods)
     local names = {}
     for _, mod in ipairs(MODIFIER_ORDER) do
-        if mods[mod] then names[#names + 1] = mod:sub(1, 1) .. mod:sub(2):lower() end
+        if mods[mod] then names[#names + 1] = ns.ModifierLabel(mod) end
     end
     return #names > 0 and table.concat(names, "+") or "Base"
 end
@@ -232,8 +244,7 @@ function ns.ResolveBinding(key)
     local command = GetBindingAction(key, true)
     if command == "" then return nil end
 
-    local verb, payload = command:match("^(%u+) (.+)$")
-    local buttonPrefix, buttonIndex = command:match("^(.-BUTTON)(%d+)$")
+    local verb, payload, buttonPrefix, buttonIndex = ns.ParseCommand(command)
     local payloadResolver = verb and PAYLOAD_RESOLVERS[verb]
     local buttonResolver = buttonPrefix and BUTTON_RESOLVERS[buttonPrefix]
 
@@ -250,24 +261,24 @@ function ns.ResolveBinding(key)
     return binding
 end
 
-local PAYLOAD_CLICK_ACTIONS = {
-    SPELL = function(spell) return "spell", "spell", spell end,
-    ITEM = function(item) return "item", "item", item end,
-    MACRO = function(macro) return "macro", "macro", macro end,
-    CLICK = function(target) return "click", "clickbutton", _G[target:match("^[^:]+")] end,
-}
+-- An unbound modifier layer falls back to the base key. Returns (key whose bind applies, isFallback).
+function ns.EffectiveKey(key, baseKey)
+    if key == baseKey or GetBindingAction(key, true) ~= "" then return key, false end
+    return baseKey, true
+end
+
+-- Verb -> secure action type, which is also the attribute holding the payload.
+local PAYLOAD_CLICK_TYPES = { SPELL = "spell", ITEM = "item", MACRO = "macro" }
 
 -- Returns (type, attribute, value) for a secure click that does what the key does, or nil for game controls.
--- An unbound modifier layer falls back to the base key.
 function ns.ClickAction(key, baseKey)
-    local command = GetBindingAction(key, true)
-    if command == "" then command = GetBindingAction(baseKey, true) end
+    local command = GetBindingAction((ns.EffectiveKey(key, baseKey)), true)
+    local verb, payload, buttonPrefix, buttonIndex = ns.ParseCommand(command)
+    if verb == "CLICK" then return "click", "clickbutton", ClickTargetButton(payload) end
 
-    local verb, payload = command:match("^(%u+) (.+)$")
-    local payloadAction = verb and PAYLOAD_CLICK_ACTIONS[verb]
-    if payloadAction then return payloadAction(payload) end
+    local actionType = verb and PAYLOAD_CLICK_TYPES[verb]
+    if actionType then return actionType, actionType, payload end
 
-    local buttonPrefix, buttonIndex = command:match("^(.-BUTTON)(%d+)$")
     local framePrefix = buttonPrefix and CLICK_FRAME_PREFIXES[buttonPrefix]
     if framePrefix then return "click", "clickbutton", _G[framePrefix .. buttonIndex] end
 end
@@ -299,7 +310,7 @@ local COOLDOWN_UPDATERS = {
 }
 
 function ns.UpdateCooldown(cooldown, binding)
-    local updater = binding and COOLDOWN_UPDATERS[binding.kind]
+    local updater = COOLDOWN_UPDATERS[binding.kind]
     if updater then
         updater(cooldown, binding.value)
     else
@@ -347,20 +358,26 @@ local TOOLTIP_SETTERS = {
 
 function ns.ShowBindingTooltip(owner, key, binding, isFallback)
     GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-    local setter = binding and TOOLTIP_SETTERS[binding.kind]
+    if not binding then
+        GameTooltip:SetText("Unbound")
+        GameTooltip:AddLine(key, 0.6, 0.6, 0.6)
+        return GameTooltip:Show()
+    end
+
+    local setter = TOOLTIP_SETTERS[binding.kind]
     if setter then
         setter(GameTooltip, binding.value)
     else
-        GameTooltip:SetText(binding and binding.name or "Unbound")
+        GameTooltip:SetText(binding.name)
     end
     GameTooltip:AddLine(key, 0.6, 0.6, 0.6)
-    if binding and binding.highestRank then
+    if binding.highestRank then
         GameTooltip:AddLine(("Highest known: Rank %d"):format(binding.highestRank), 0.6, 0.6, 0.6)
     end
-    if binding and binding.kind == "command" and not (binding.icon or binding.atlas) then
+    if binding.kind == "command" and not (binding.icon or binding.atlas) then
         GameTooltip:AddLine(binding.command, 0.45, 0.45, 0.45)
     end
-    if isFallback and binding then
+    if isFallback then
         GameTooltip:AddLine("Not bound on this layer: the base key fires instead.", 1, 0.82, 0, true)
     end
     GameTooltip:Show()

@@ -31,15 +31,10 @@ local COMMAND_BINDERS = {
 
 local function BindCommand(key, command)
     if command == "" then return SetBinding(key) end
-    local verb, payload = command:match("^(%u+) (.+)$")
+    local verb, payload = ns.ParseCommand(command)
     local binder = verb and COMMAND_BINDERS[verb]
     if binder then return binder(key, payload) end
     SetBinding(key, command)
-end
-
--- Every character keeps its own binding set (see CharacterBinds.lua).
-local function SaveAll()
-    SaveBindings(Enum.BindingSet.Character)
 end
 
 local Setup = { active = false, mods = {} }
@@ -92,12 +87,12 @@ function Setup:BindCursor(key)
         return ns.Print(("Can't bind a %s to a key."):format(tostring(cursorType)))
     end
     binder(key, info1, info2, info3)
-    SaveAll()
+    ns.SaveCharacterBindings()
 end
 
 function Setup:ClearKey(key)
     SetBinding(key)
-    SaveAll()
+    ns.SaveCharacterBindings()
 end
 
 function Setup:BeginSwap(cap)
@@ -114,7 +109,7 @@ function Setup:FinishSwap(target)
     local targetCommand = GetBindingAction(target.bindKey)
     BindCommand(source.bindKey, targetCommand)
     BindCommand(target.bindKey, sourceCommand)
-    SaveAll()
+    ns.SaveCharacterBindings()
 end
 
 -- Game controls have no cursor object, so dragging one from the list shows a label that follows the mouse.
@@ -132,7 +127,7 @@ function Setup:FinishCommandDrag(target)
     self:DragFollower():Hide()
     if not command or not ns.keycaps[target] or not target.bindKey or not self:CanEdit() then return end
     BindCommand(target.bindKey, command)
-    SaveAll()
+    ns.SaveCharacterBindings()
 end
 
 function Setup:DragFollower()
@@ -195,5 +190,5 @@ function Setup:UpdateLayerBar()
 end
 
 function Setup:OnCombatChanged()
-    if self.active then ns.Keyboard:Refresh() end
+    if self.active then ns.Keyboard:UpdateTitle(self.mods) end
 end

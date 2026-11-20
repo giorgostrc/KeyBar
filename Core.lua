@@ -170,13 +170,33 @@ SlashCmdList.KEYBAR = function(input)
     end
 end
 
-local function RequestRefresh() Keyboard:RequestRefresh() end
-local function RefreshCooldowns() Keyboard:RefreshCooldowns() end
+-- Events like UPDATE_BINDINGS and SPELL_UPDATE_COOLDOWN fire in bursts; each burst costs one pass on the next frame.
+local function OncePerFrame(fn)
+    local pending = false
+    local function run()
+        pending = false
+        fn()
+    end
+    return function()
+        if pending then return end
+        pending = true
+        C_Timer.After(0, run)
+    end
+end
+
+local RequestRefresh = OncePerFrame(function() Keyboard:Refresh() end)
+local RefreshCooldowns = OncePerFrame(function() Keyboard:RefreshCooldowns() end)
+local OnBindingsChanged = OncePerFrame(function()
+    Keyboard:Refresh()
+    Keyboard:UpdateClickActions()
+    ControlsList:Refresh()
+    ns.RefreshSpellbook()
+end)
 
 local EVENT_HANDLERS = {
     MODIFIER_STATE_CHANGED = function(key, down)
         Keyboard:SetTokenPressed(key, down == 1)
-        if not Setup.active then Keyboard:RequestRefresh() end
+        if not Setup.active then RequestRefresh() end
     end,
     GLOBAL_MOUSE_DOWN = function(button) Keyboard:OnMouseButton(button, true) end,
     GLOBAL_MOUSE_UP = function(button) Keyboard:OnMouseButton(button, false) end,
@@ -185,12 +205,7 @@ local EVENT_HANDLERS = {
         if Keyboard.clickActionsPending then Keyboard:UpdateClickActions() end
         Setup:OnCombatChanged()
     end,
-    UPDATE_BINDINGS = function()
-        Keyboard:RequestRefresh()
-        Keyboard:UpdateClickActions()
-        ControlsList:Refresh()
-        ns.RefreshSpellbook()
-    end,
+    UPDATE_BINDINGS = OnBindingsChanged,
     ACTIONBAR_SLOT_CHANGED = RequestRefresh,
     ACTIONBAR_PAGE_CHANGED = RequestRefresh,
     UPDATE_BONUS_ACTIONBAR = RequestRefresh,
