@@ -1,0 +1,4 @@
+package-as: KeyBar
+
+ignore:
+  - README.md

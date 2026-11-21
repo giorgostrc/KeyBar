@@ -2,7 +2,7 @@
 ## Title: KeyBar
 ## Notes: On-screen keyboard showing what every key does, per modifier layer.
 ## Author: Giorgos Tritsarolis
-## Version: 0.1.0
+## Version: @project-version@
 ## SavedVariables: KeyBarDB
 
 Layouts.lua
