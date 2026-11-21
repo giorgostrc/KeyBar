@@ -15,7 +15,7 @@ Copy this folder into your Forever client's `Interface\AddOns` folder, as `Inter
 - Consumables (potions, food, bandages, ...) show how many you carry in that corner instead, and grey out when you have none.
 - Spells bound straight to a key no longer get the spellbook's "not on your action bars" highlight.
 - Move the frame by its title bar or border; dragging a key no longer moves it. The keyboard can't be moved, resized or hidden in combat.
-- Skins: Classic, Minimal (flat, borderless) and Gilded (Blizzard dialog frame, gold edges). The title bar can be hidden; with it hidden, drag the frame's edge to move it.
+- Skins: Minimal (default; flat and see-through), Classic (tooltip frame), Blizzard (bronze, like Blizzard's windows) and Gilded (Blizzard dialog frame, gold edges). Every skin keeps the window the same size. The title bar can be hidden; with it hidden, drag the frame's edge to move it.
 - Hover the keyboard to reveal move, scale, lock and settings icons in its top-right corner. Drag the move icon to reposition; drag the scale grip left or right to resize (50%–200%, top-left corner stays put). The lock disables both. Settings: layout (QWERTY/QWERTZ/AZERTY/UK), size (Full/TKL/75/65/60), rows, scale, lock, setup mode.
 - `/keybar` toggles the frame. `/keybar help` lists every command.
 
@@ -50,7 +50,7 @@ WoW names keys by the character your OS layout produces. Run `/keybar keytest`, 
 | `Keyboard.lua` | Main frame: layout, layer switching, press highlights |
 | `ControlsList.lua` | Searchable game controls list, grouped like the Key Bindings menu |
 | `Setup.lua` | Drag-and-drop binding, clear, swap, layer picker |
-| `Skins.lua` | Classic, Minimal and Gilded looks |
+| `Skins.lua` | Minimal, Classic, Blizzard and Gilded looks |
 | `Spellbook.lua` | Marks key-bound spells as placed in the spellbook |
 | `CharacterBinds.lua` | First-login choice of starting binds |
 | `Core.lua` | Saved settings, options menu, slash commands, events |

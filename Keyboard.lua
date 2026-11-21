@@ -267,10 +267,10 @@ function Keyboard:SetClampedScale(scale)
     self:SavePosition()
 end
 
--- Skin padding and the optional title row decide where the board sits inside the frame.
+-- The shared padding and the optional title row decide where the board sits inside the frame.
 function Keyboard:ApplySkin()
     local skin = ns.CurrentSkin()
-    local padding = skin.frame.padding
+    local padding = ns.FRAME_PADDING
     self.boardTop = padding + (ns.db.showTitle and TITLE_HEIGHT or 0)
 
     ns.ApplyFrameSkin(self, skin)
@@ -294,7 +294,7 @@ end
 
 function Keyboard:Layout()
     self:ApplySkin()
-    local padding = ns.CurrentSkin().frame.padding
+    local padding = ns.FRAME_PADDING
     local defs = ns.BuildKeyboard(ns.db.locale, ns.db.form)
     local rowY, height = RowOffsets(defs)
     local count, width = 0, 0
