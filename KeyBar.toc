@@ -1,9 +1,11 @@
 ## Interface: 16001
 ## Title: KeyBar
 ## Notes: On-screen keyboard showing what every key does, per modifier layer.
+## IconTexture: Interface\AddOns\KeyBar\keybar-icon
 ## Author: Giorgos Tritsarolis
 ## Version: @project-version@
 ## SavedVariables: KeyBarDB
+## X-Curse-Project-ID: 1821767
 
 Layouts.lua
 Skins.lua

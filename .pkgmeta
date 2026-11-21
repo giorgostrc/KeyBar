@@ -2,3 +2,4 @@ package-as: KeyBar
 
 ignore:
   - README.md
+  - keybar-icon.webp
