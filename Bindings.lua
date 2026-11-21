@@ -15,12 +15,6 @@ local BAR_BUTTON_FRAMES = {
     MULTIACTIONBAR7BUTTON = "MultiBar7Button",
 }
 
--- Binding command prefix -> frame a secure click can delegate to.
-local CLICK_FRAME_PREFIXES = { SHAPESHIFTBUTTON = "StanceButton", BONUSACTIONBUTTON = "PetActionButton" }
-for commandPrefix, framePrefix in pairs(BAR_BUTTON_FRAMES) do
-    CLICK_FRAME_PREFIXES[commandPrefix] = framePrefix
-end
-
 ns.LAYERS = {
     {},
     { SHIFT = true },
@@ -163,11 +157,6 @@ function ns.ParseCommand(command)
     return verb, payload, buttonPrefix, buttonIndex
 end
 
--- A CLICK target reads "FrameName:MouseButton".
-local function ClickTargetButton(target)
-    return _G[target:match("^[^:]+")]
-end
-
 -- Spells the character doesn't know resolve to nil, so the key shows the spell's name as text.
 local PAYLOAD_RESOLVERS = {
     SPELL = function(spell)
@@ -185,8 +174,9 @@ local PAYLOAD_RESOLVERS = {
         local _, icon = GetMacroInfo(index)
         return { kind = "macro", value = index, icon = icon }
     end,
+    -- The target reads "FrameName:MouseButton".
     CLICK = function(target)
-        local button = ClickTargetButton(target)
+        local button = _G[target:match("^[^:]+")]
         return button and FromActionSlot(button.action)
     end,
 }
@@ -229,6 +219,24 @@ local function RankNumber(spellID)
     return subtext and tonumber(subtext:match("%d+"))
 end
 
+local function BindingItemID(binding)
+    if binding.kind == "item" then return binding.value end
+    if binding.kind == "macro" then
+        local _, itemLink = GetMacroItem(binding.value)
+        return itemLink and C_Item.GetItemInfoInstant(itemLink)
+    end
+    if binding.kind ~= "action" then return nil end
+    local actionType, id = GetActionInfo(binding.value)
+    return actionType == "item" and id or nil
+end
+
+-- Bag count of a consumable-class item (potion, food, drink, mana gem, ...), including charges; nil for anything else.
+local function ConsumableCount(binding)
+    local itemID = BindingItemID(binding)
+    if not itemID or select(6, C_Item.GetItemInfoInstant(itemID)) ~= Enum.ItemClass.Consumable then return nil end
+    return C_Item.GetItemCount(itemID, false, true)
+end
+
 -- Returns (rank, highestRank) when the spell is a lower rank than the highest known; nil otherwise.
 -- Looking a spell up by name yields the highest rank the character knows.
 local function LowerRank(spellID)
@@ -258,6 +266,7 @@ function ns.ResolveBinding(key)
     binding.label = DisplayLabel(command, name, buttonPrefix, buttonIndex)
     binding.arrow = COMMAND_ARROWS[command]
     binding.rank, binding.highestRank = LowerRank(BindingSpellID(binding))
+    binding.count = ConsumableCount(binding)
     return binding
 end
 
@@ -270,17 +279,38 @@ end
 -- Verb -> secure action type, which is also the attribute holding the payload.
 local PAYLOAD_CLICK_TYPES = { SPELL = "spell", ITEM = "item", MACRO = "macro" }
 
+-- A secure "click" sends its target only a key-up, which Blizzard's action buttons ignore while
+-- "cast on key down" is on. Clicking down then up, like a key press, fires them either way, and
+-- clicking the button itself follows bar paging (stances, stealth) in combat.
+local function KeyPressMacro(frameName, mouseButton)
+    return ("/click %s %s true\n/click %s %s false"):format(frameName, mouseButton, frameName, mouseButton)
+end
+
+-- Binding command prefix -> (type, attribute, value) for a secure click; receives the button index as a string.
+local BUTTON_CLICK_ACTIONS = {
+    SHAPESHIFTBUTTON = function(index) return "click", "clickbutton", _G["StanceButton" .. index] end,
+    BONUSACTIONBUTTON = function(index) return "pet", "action", tonumber(index) end,
+}
+for commandPrefix, framePrefix in pairs(BAR_BUTTON_FRAMES) do
+    BUTTON_CLICK_ACTIONS[commandPrefix] = function(index)
+        return "macro", "macrotext", KeyPressMacro(framePrefix .. index, "LeftButton")
+    end
+end
+
 -- Returns (type, attribute, value) for a secure click that does what the key does, or nil for game controls.
 function ns.ClickAction(key, baseKey)
     local command = GetBindingAction((ns.EffectiveKey(key, baseKey)), true)
     local verb, payload, buttonPrefix, buttonIndex = ns.ParseCommand(command)
-    if verb == "CLICK" then return "click", "clickbutton", ClickTargetButton(payload) end
+    if verb == "CLICK" then
+        local frameName, mouseButton = payload:match("^([^:]+):?(.*)$")
+        return "macro", "macrotext", KeyPressMacro(frameName, mouseButton ~= "" and mouseButton or "LeftButton")
+    end
 
     local actionType = verb and PAYLOAD_CLICK_TYPES[verb]
     if actionType then return actionType, actionType, payload end
 
-    local framePrefix = buttonPrefix and CLICK_FRAME_PREFIXES[buttonPrefix]
-    if framePrefix then return "click", "clickbutton", _G[framePrefix .. buttonIndex] end
+    local buttonAction = buttonPrefix and BUTTON_CLICK_ACTIONS[buttonPrefix]
+    if buttonAction then return buttonAction(buttonIndex) end
 end
 
 local function ApplyDuration(cooldown, duration)

@@ -12,6 +12,7 @@ Copy this folder into your Forever client's `Interface\AddOns` folder, as `Inter
 - Click a key to cast or use what's bound to it. Hold Shift/Ctrl/Alt while clicking for that layer; this works in combat too. Game controls (map, autorun, ...) aren't clickable.
 - Icons tint like Blizzard's action bars: red when your target is out of range (the key label turns red too), blue when you lack mana/energy, grey when unusable.
 - A key that casts a lower rank than you know (a downranked macro, or an old rank on a bar) shows a small grey "R1" in the corner; the tooltip adds your highest known rank. Highest-rank keys show nothing.
+- Consumables (potions, food, bandages, ...) show how many you carry in that corner instead, and grey out when you have none.
 - Spells bound straight to a key no longer get the spellbook's "not on your action bars" highlight.
 - Move the frame by its title bar or border; dragging a key no longer moves it. The keyboard can't be moved, resized or hidden in combat.
 - Skins: Classic, Minimal (flat, borderless) and Gilded (Blizzard dialog frame, gold edges). The title bar can be hidden; with it hidden, drag the frame's edge to move it.

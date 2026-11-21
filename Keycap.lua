@@ -4,7 +4,10 @@ local ICON_INSET = 6
 local ARROW_TEXTURE = "Interface\\Minimap\\MinimapArrow"
 local ARROW_SIZE = 18
 local LABEL_FONT_SIZES = { 10, 9, 8 }
-local RANK_FONT_SIZE = 9
+local CORNER_FONT_SIZE = 9
+local COUNT_COLOR = { 1, 1, 1 }
+-- Muted so a lower rank reads as information, not a warning.
+local RANK_COLOR = { 0.75, 0.75, 0.75 }
 
 -- Blizzard's action button tints.
 local ICON_TINTS = {
@@ -54,12 +57,11 @@ function ns.CreateKeycap(parent, index)
     cap.Arrow:SetSize(ARROW_SIZE, ARROW_SIZE)
     cap.Arrow:SetPoint("CENTER", 0, 1)
 
-    -- Shown only for lower ranks; muted so it reads as information, not a warning.
-    cap.RankLabel = overlay:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-    local font, _, flags = cap.RankLabel:GetFont()
-    cap.RankLabel:SetFont(font, RANK_FONT_SIZE, flags)
-    cap.RankLabel:SetPoint("BOTTOMRIGHT", -3, 3)
-    cap.RankLabel:SetTextColor(0.75, 0.75, 0.75)
+    -- A consumable's bag count, or a lower spell rank.
+    cap.CornerLabel = overlay:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+    local font, _, flags = cap.CornerLabel:GetFont()
+    cap.CornerLabel:SetFont(font, CORNER_FONT_SIZE, flags)
+    cap.CornerLabel:SetPoint("BOTTOMRIGHT", -3, 3)
 
     cap:SetScript("OnEnter", cap.OnEnter)
     cap:SetScript("OnLeave", GameTooltip_Hide)
@@ -109,14 +111,24 @@ function KeycapMixin:ShowBinding(bindKey, binding, isFallback, modifierActive)
     self.CommandLabel:SetJustifyV(arrow and "BOTTOM" or "MIDDLE")
     self.CommandLabel:SetAlpha(isFallback and 0.45 or 1)
     self.Art:SetShown(icon ~= nil)
-    self.RankLabel:SetText(icon and binding.rank and ("R" .. binding.rank) or "")
+    self:UpdateCornerLabel(icon and binding)
     if icon then
         ns.SetIconArt(self.Art.icon, binding)
-        self.Art.icon:SetDesaturated(isFallback)
+        self.Art.icon:SetDesaturated(isFallback or binding.count == 0)
         self.Art:SetAlpha(isFallback and 0.35 or 1)
         self:UpdateCooldown()
     end
     self:UpdateUsability()
+end
+
+function KeycapMixin:UpdateCornerLabel(binding)
+    local label = self.CornerLabel
+    if binding and binding.count then
+        label:SetText(binding.count)
+        return label:SetTextColor(unpack(COUNT_COLOR))
+    end
+    label:SetText(binding and binding.rank and ("R" .. binding.rank) or "")
+    label:SetTextColor(unpack(RANK_COLOR))
 end
 
 function KeycapMixin:UpdateUsability()
@@ -166,7 +178,7 @@ function KeycapMixin:OnEnter()
     ns.ShowBindingTooltip(self, self.bindKey, self.binding, self.isFallback)
 end
 
-local CLICK_FIELDS = { "spell", "item", "macro", "clickbutton" }
+local CLICK_FIELDS = { "spell", "item", "macro", "macrotext", "action", "clickbutton" }
 
 -- Secure buttons pick attributes by the modifiers held at click time ("shift-type", "alt-ctrl-spell", ...),
 -- so every layer is configured up front and clicking keeps working in combat.

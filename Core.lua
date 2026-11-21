@@ -213,6 +213,7 @@ local EVENT_HANDLERS = {
     SPELLS_CHANGED = RequestRefresh,
     UPDATE_SHAPESHIFT_FORMS = RequestRefresh,
     PET_BAR_UPDATE = RequestRefresh,
+    BAG_UPDATE_DELAYED = RequestRefresh,
     SPELL_UPDATE_COOLDOWN = RefreshCooldowns,
     ACTIONBAR_UPDATE_COOLDOWN = RefreshCooldowns,
     BAG_UPDATE_COOLDOWN = RefreshCooldowns,
