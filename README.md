@@ -2,6 +2,12 @@
 
 An on-screen keyboard for WoW: Forever (interface 16001) that shows what each key does, with one layer per modifier.
 
+![KeyBar on screen](media/keyboard.png)
+
+| Setup mode | Settings |
+|---|---|
+| ![Setup mode with the game controls list](media/setup-mode.png) | ![Settings menu](media/settings-menu.png) |
+
 ## Install
 
 Copy this folder into your Forever client's `Interface\AddOns` folder, as `Interface\AddOns\KeyBar`. The folder name has to match `KeyBar.toc`.
