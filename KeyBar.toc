@@ -13,7 +13,7 @@ Bindings.lua
 Keycap.lua
 Keyboard.lua
 ControlsList.lua
-Setup.lua
+Editing.lua
 Spellbook.lua
 CharacterBinds.lua
 Core.lua

@@ -1,6 +1,6 @@
 local addonName, ns = ...
 
-local Keyboard, Setup, ControlsList = ns.Keyboard, ns.Setup, ns.ControlsList
+local Keyboard, Editing, ControlsList = ns.Keyboard, ns.Editing, ns.ControlsList
 
 local DEFAULTS = {
     shown = true,
@@ -95,8 +95,7 @@ function ns.OpenMenu(owner)
         root:CreateDivider()
         root:CreateCheckbox("Show title bar", function() return ns.db.showTitle end,
             function() SetOption("showTitle", not ns.db.showTitle) end)
-        root:CreateCheckbox("Lock position", function() return ns.db.locked end, function() Keyboard:SetLocked(not ns.db.locked) end)
-        root:CreateCheckbox("Setup mode", function() return Setup.active end, function() Setup:SetActive(not Setup.active) end)
+        root:CreateCheckbox("Lock keys and position", function() return ns.db.locked end, function() Keyboard:SetLocked(not ns.db.locked) end)
         root:CreateCheckbox("Game controls list", function() return ControlsList:IsShown() end,
             function() ControlsList:SetShown(not ControlsList:IsShown()) end)
         root:CreateButton("Hide", function() Keyboard:SetVisible(false) end)
@@ -117,7 +116,6 @@ local SLASH_COMMANDS = {
         Keyboard:SetLocked(not ns.db.locked)
         ns.Print(ns.db.locked and "Locked." or "Unlocked.")
     end,
-    setup = function() Setup:SetActive(not Setup.active) end,
     controls = function() ControlsList:SetShown(not ControlsList:IsShown()) end,
     menu = function() ns.OpenMenu(Keyboard) end,
     layout = function(arg) ChooseOption(ns.LOCALE_OPTIONS, "locale", arg) end,
@@ -146,9 +144,8 @@ local SLASH_COMMANDS = {
 
 local HELP = {
     "/keybar - toggle the keyboard",
-    "/keybar setup - toggle setup mode (drag & drop binding)",
     "/keybar controls - toggle the grouped game controls list",
-    "/keybar lock - lock or unlock position",
+    "/keybar lock - lock or unlock keys and position",
     "/keybar menu - open options (or hover the keyboard and click the gear)",
     "/keybar layout <" .. OptionIds(ns.LOCALE_OPTIONS) .. ">",
     "/keybar size <" .. OptionIds(ns.FORM_OPTIONS) .. ">",
@@ -196,14 +193,17 @@ end)
 local EVENT_HANDLERS = {
     MODIFIER_STATE_CHANGED = function(key, down)
         Keyboard:SetTokenPressed(key, down == 1)
-        if not Setup.active then RequestRefresh() end
+        RequestRefresh()
     end,
-    GLOBAL_MOUSE_DOWN = function(button) Keyboard:OnMouseButton(button, true) end,
+    GLOBAL_MOUSE_DOWN = function(button)
+        Keyboard:OnMouseButton(button, true)
+        Editing:OnGlobalMouseDown()
+    end,
     GLOBAL_MOUSE_UP = function(button) Keyboard:OnMouseButton(button, false) end,
-    PLAYER_REGEN_DISABLED = function() Setup:OnCombatChanged() end,
+    -- Binds can't be edited in combat, so a held game control is dropped.
+    PLAYER_REGEN_DISABLED = function() Editing:Release() end,
     PLAYER_REGEN_ENABLED = function()
         if Keyboard.clickActionsPending then Keyboard:UpdateClickActions() end
-        Setup:OnCombatChanged()
     end,
     UPDATE_BINDINGS = OnBindingsChanged,
     ACTIONBAR_SLOT_CHANGED = RequestRefresh,

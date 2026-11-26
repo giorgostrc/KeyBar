@@ -5,6 +5,7 @@ local ROW_HEIGHT = 20
 local ICON_SIZE = 16
 -- Opaque enough to read text on, whatever the skin's own background.
 local LIST_BACKGROUND_ALPHA = 0.85
+local TITLE = "Game Controls"
 
 local ControlsList = { expanded = {} }
 ns.ControlsList = ControlsList
@@ -35,7 +36,10 @@ local function ShowRowTooltip(row)
     GameTooltip:SetText(element.name)
     local key1, key2 = GetBindingKey(element.command)
     GameTooltip:AddLine(key1 and table.concat({ key1, key2 }, ", ") or "Unbound", 0.6, 0.6, 0.6)
-    GameTooltip:AddLine("Drag onto a key in setup mode to bind it.", 1, 0.82, 0, true)
+    local targetKey = ControlsList.targetKey
+    local hint = targetKey and ("Click to bind to %s."):format(GetBindingText(targetKey))
+        or "Drag onto a key, or click to pick up."
+    GameTooltip:AddLine(hint, 1, 0.82, 0, true)
     GameTooltip:Show()
 end
 
@@ -55,13 +59,11 @@ local function CreateRowRegions(row)
 
     row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
     row:RegisterForDrag("LeftButton")
-    row:SetScript("OnClick", function(self)
-        if self.element.header then ControlsList:ToggleGroup(self.element.header) end
-    end)
+    row:SetScript("OnClick", function(self) ControlsList:OnRowClick(self.element) end)
     row:SetScript("OnDragStart", function(self)
-        if not self.element.header then ns.Setup:BeginCommandDrag(self.element.command, self.element.name) end
+        if not self.element.header then ns.Editing:PickUpControl(self.element.command) end
     end)
-    row:SetScript("OnDragStop", function() ns.Setup:FinishCommandDrag(GetMouseFoci()[1]) end)
+    row:SetScript("OnDragStop", function() ns.Editing:FinishDrag() end)
     row:SetScript("OnEnter", ShowRowTooltip)
     row:SetScript("OnLeave", GameTooltip_Hide)
 end
@@ -99,10 +101,13 @@ function ControlsList:Panel()
         self.groups = CollectGroups()
         self:Refresh()
     end)
+    panel:SetScript("OnHide", function() self:SetTargetKey(nil) end)
 
     panel.Title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     panel.Title:SetPoint("TOPLEFT", 10, -6)
-    panel.Title:SetText("Game Controls")
+    panel.Title:SetPoint("RIGHT", -10, 0)
+    panel.Title:SetJustifyH("LEFT")
+    panel.Title:SetText(TITLE)
 
     panel.Search = CreateFrame("EditBox", nil, panel, "SearchBoxTemplate")
     panel.Search:SetPoint("TOPLEFT", 14, -24)
@@ -156,6 +161,25 @@ function ControlsList:Refresh()
     if not self:IsShown() then return end
     local provider = CreateDataProvider(self:BuildElements())
     self.panel.ScrollBox:SetDataProvider(provider, ScrollBoxConstants.RetainScrollPosition)
+end
+
+-- Opened from a key's menu, the list binds the clicked control straight to that key.
+function ControlsList:OpenForKey(key)
+    self:SetShown(true)
+    self:SetTargetKey(key)
+    self.panel.Search:SetFocus()
+end
+
+function ControlsList:SetTargetKey(key)
+    self.targetKey = key
+    self.panel.Title:SetText(key and ("Binding |cffffffff%s|r"):format(GetBindingText(key)) or TITLE)
+end
+
+function ControlsList:OnRowClick(element)
+    if element.header then return self:ToggleGroup(element.header) end
+    if not self.targetKey then return ns.Editing:PickUpControl(element.command) end
+    ns.Editing:BindControl(self.targetKey, element.command)
+    self:SetTargetKey(nil)
 end
 
 function ControlsList:ToggleGroup(header)

@@ -193,12 +193,12 @@ function ns.ModifierPrefix(mods)
     return prefix
 end
 
-function ns.LayerName(mods)
-    local names = {}
+function ns.CombineModifiers(mods, otherMods)
+    local combined = {}
     for _, mod in ipairs(MODIFIER_ORDER) do
-        if mods[mod] then names[#names + 1] = ns.ModifierLabel(mod) end
+        combined[mod] = mods[mod] or otherMods[mod] or nil
     end
-    return #names > 0 and table.concat(names, "+") or "Base"
+    return combined
 end
 
 -- Macros resolve to the spell they would cast, including a specific rank such as "/cast Frostbolt(Rank 1)".
@@ -251,7 +251,10 @@ end
 function ns.ResolveBinding(key)
     local command = GetBindingAction(key, true)
     if command == "" then return nil end
+    return ns.ResolveCommand(command)
+end
 
+function ns.ResolveCommand(command)
     local verb, payload, buttonPrefix, buttonIndex = ns.ParseCommand(command)
     local payloadResolver = verb and PAYLOAD_RESOLVERS[verb]
     local buttonResolver = buttonPrefix and BUTTON_RESOLVERS[buttonPrefix]

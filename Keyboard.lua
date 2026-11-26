@@ -6,7 +6,9 @@ local TITLE_HEIGHT = 16
 local ROW_GAP_BEFORE = { num = 0.25, mouse = 0.5 }
 local PRESS_FLASH_SECONDS = 0.15
 local USABILITY_POLL_SECONDS = 0.2
-local CORNER_BUTTON_SIZE = 16
+local CORNER_BUTTON_SIZE = 20
+-- Blizzard's lock art sits inside a wide transparent margin; cropping it lets the padlock fill its button.
+local LOCK_TEXCOORDS = { 0.15, 0.85, 0.15, 0.85 }
 local CORNER_BUTTON_GAP = 4
 local CORNER_FADE_PER_SECOND = 5
 local LOCKED_BUTTON_ALPHA = 0.35
@@ -40,6 +42,8 @@ end
 
 local Keyboard = CreateFrame("Frame", "KeyBarFrame", UIParent, "BackdropTemplate")
 Keyboard:Hide()
+-- Modifiers clicked on the board stay active until clicked again, so a layer can be edited hands-free.
+Keyboard.latched = {}
 ns.Keyboard = Keyboard
 
 function Keyboard:Init()
@@ -53,6 +57,7 @@ function Keyboard:Init()
     self:SetScript("OnHide", self.OnHide)
 
     self.Title = self:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.Title:SetText(addonName)
     self.Board = CreateFrame("Frame", nil, self)
     self:CreateCornerControls()
 
@@ -147,10 +152,10 @@ local function LockedTooltip(action)
     end
 end
 
--- Move, scale, lock and settings icons that fade in while the mouse is over the keyboard, like Details! does.
+-- Move, scale, lock, game controls and settings icons that fade in while the mouse is over the keyboard, like Details! does.
 function Keyboard:CreateCornerControls()
     local corner = CreateFrame("Frame", nil, self)
-    corner:SetSize(4 * CORNER_BUTTON_SIZE + 3 * CORNER_BUTTON_GAP, CORNER_BUTTON_SIZE)
+    corner:SetSize(5 * CORNER_BUTTON_SIZE + 4 * CORNER_BUTTON_GAP, CORNER_BUTTON_SIZE)
     corner:SetFrameLevel(self:GetFrameLevel() + 20)
     corner:SetAlpha(0)
 
@@ -158,10 +163,16 @@ function Keyboard:CreateCornerControls()
     corner.Settings:SetScript("OnClick", function(button) ns.OpenMenu(button) end)
     corner.Settings:SetPoint("RIGHT")
 
-    corner.Lock = CreateCornerButton(corner, "Interface\\Buttons\\LockButton-Unlocked-Up",
-        function() return ns.db.locked and "Unlock position and scale" or "Lock position and scale" end)
+    corner.Controls = CreateCornerButton(corner, "Interface\\Icons\\INV_Misc_Book_09", function() return "Game controls" end)
+    corner.Controls:SetScript("OnClick", function() ns.ControlsList:SetShown(not ns.ControlsList:IsShown()) end)
+    corner.Controls:SetPoint("RIGHT", corner.Settings, "LEFT", -CORNER_BUTTON_GAP, 0)
+
+    -- Parented to the keyboard rather than the fading corner, so it can stay visible while locked.
+    corner.Lock = CreateCornerButton(self, "Interface\\Buttons\\LockButton-Unlocked-Up",
+        function() return ns.db.locked and "Unlock keys and position" or "Lock keys and position" end)
+    corner.Lock:SetFrameLevel(corner:GetFrameLevel())
     corner.Lock:SetScript("OnClick", function() self:SetLocked(not ns.db.locked) end)
-    corner.Lock:SetPoint("RIGHT", corner.Settings, "LEFT", -CORNER_BUTTON_GAP, 0)
+    corner.Lock:SetPoint("RIGHT", corner.Controls, "LEFT", -CORNER_BUTTON_GAP, 0)
 
     corner.Scale = CreateCornerButton(corner, "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up", LockedTooltip("drag left or right to scale"))
     corner.Scale:SetScript("OnMouseDown", function() self:BeginScaling() end)
@@ -179,6 +190,7 @@ function Keyboard:CreateCornerControls()
         if alpha == target then return end
         local step = elapsed * CORNER_FADE_PER_SECOND
         frame:SetAlpha(target > alpha and math.min(target, alpha + step) or math.max(target, alpha - step))
+        self:UpdateLockAlpha()
     end)
 
     self.Corner = corner
@@ -188,15 +200,23 @@ end
 function Keyboard:SetLocked(locked)
     ns.db.locked = locked
     self:UpdateLockButton()
+    self:UpdateClickActions()
 end
 
 -- Move and scale dim while locked so it's clear they're inactive.
 function Keyboard:UpdateLockButton()
     local state = ns.db.locked and "Locked" or "Unlocked"
     self.Corner.Lock:SetNormalTexture("Interface\\Buttons\\LockButton-" .. state .. "-Up")
+    self.Corner.Lock:GetNormalTexture():SetTexCoord(unpack(LOCK_TEXCOORDS))
     local alpha = ns.db.locked and LOCKED_BUTTON_ALPHA or 1
     self.Corner.Move:SetAlpha(alpha)
     self.Corner.Scale:SetAlpha(alpha)
+    self:UpdateLockAlpha()
+end
+
+-- Locked, the padlock always shows so it's clear why keys can't be dragged; unlocked, it fades with the corner.
+function Keyboard:UpdateLockAlpha()
+    self.Corner.Lock:SetAlpha(ns.db.locked and 1 or self.Corner:GetAlpha())
 end
 
 -- The move icon can sit outside the frame (title bar hidden), where StartMoving snaps the frame to the
@@ -282,7 +302,7 @@ function Keyboard:ApplySkin()
     -- In the title row when there is one; otherwise just above the frame so no key is covered.
     self.Corner:ClearAllPoints()
     if ns.db.showTitle then
-        self.Corner:SetPoint("TOPRIGHT", -padding, -(padding - 2))
+        self.Corner:SetPoint("TOPRIGHT", -padding, -(padding - 4))
     else
         self.Corner:SetPoint("BOTTOMRIGHT", self, "TOPRIGHT", -padding, 2)
     end
@@ -328,7 +348,6 @@ function Keyboard:Layout()
     self:UpdateClickActions()
 end
 
--- Click actions are disabled in setup mode so clicks edit binds instead of casting.
 -- Bind changes during combat are applied once combat ends.
 function Keyboard:UpdateClickActions()
     if InCombatLockdown() then
@@ -336,31 +355,27 @@ function Keyboard:UpdateClickActions()
         return
     end
     self.clickActionsPending = false
-    local enabled = not ns.Setup.active
     for i = 1, self.visibleCount do
-        local cap = self.caps[i]
-        cap:UpdateClickActions(enabled and cap.def.token ~= nil and not cap.def.modifier)
+        self.caps[i]:UpdateClickActions(self.latched)
     end
+end
+
+-- Clicks cast the latched layer, and secure click actions can't change in combat, so neither can the latch.
+function Keyboard:ToggleLatch(modifier)
+    if ns.BlockedInCombat() then return end
+    self.latched[modifier] = not self.latched[modifier] or nil
+    self:Refresh()
+    self:UpdateClickActions()
 end
 
 function Keyboard:ActiveModifiers()
-    return ns.Setup.active and ns.Setup.mods or ns.CurrentModifiers()
-end
-
-function Keyboard:UpdateTitle(mods)
-    local layer = ns.LayerName(mods)
-    if not ns.Setup.active then
-        return self.Title:SetText(("%s  |cffffffff%s|r"):format(addonName, layer))
-    end
-    local lock = InCombatLockdown() and "  |cffff4040(locked in combat)|r" or ""
-    self.Title:SetText(("%s  |cff40c0ffSetup: %s|r%s"):format(addonName, layer, lock))
+    return ns.CombineModifiers(ns.CurrentModifiers(), self.latched)
 end
 
 function Keyboard:Refresh()
     if not self:IsShown() then return end
     local mods = self:ActiveModifiers()
     local prefix = ns.ModifierPrefix(mods)
-    self:UpdateTitle(mods)
 
     for i = 1, self.visibleCount do
         local cap = self.caps[i]
