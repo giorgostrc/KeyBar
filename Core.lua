@@ -1,6 +1,6 @@
 local addonName, ns = ...
 
-local Keyboard, Editing, ControlsList = ns.Keyboard, ns.Editing, ns.ControlsList
+local Keyboard, Editing, ControlsList, CharacterBinds = ns.Keyboard, ns.Editing, ns.ControlsList, ns.CharacterBinds
 
 local DEFAULTS = {
     shown = true,
@@ -90,6 +90,11 @@ function ns.OpenMenu(owner)
         local rows = root:CreateButton("Rows")
         for _, row in ipairs(ns.ROW_OPTIONS) do
             rows:CreateCheckbox(row.name, function() return ns.db.rows[row.id] end, function() ToggleRow(row.id) end)
+        end
+
+        local resetBinds = root:CreateButton("Reset keybinds")
+        for _, option in ipairs(CharacterBinds.RESET_OPTIONS) do
+            resetBinds:CreateButton(option.name .. "...", function() CharacterBinds:ConfirmReset(option) end)
         end
 
         root:CreateDivider()

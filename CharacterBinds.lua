@@ -65,6 +65,7 @@ local CharacterBinds = { variablesLoaded = false, done = false }
 ns.CharacterBinds = CharacterBinds
 
 function CharacterBinds:Start(loadStartingBinds)
+    if self.startDialog then self.startDialog:Hide() end
     loadStartingBinds()
     ns.SaveCharacterBindings()
     ns.db.setUpCharacters[UnitGUID("player")] = true
@@ -84,6 +85,7 @@ end
 
 function CharacterBinds:ShowStartDialog()
     local dialog = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    self.startDialog = dialog
     ns.ApplyFrameSkin(dialog, ns.CurrentSkin(), 0.95)
     dialog:SetFrameStrata("DIALOG")
     dialog:SetPoint("CENTER", 0, 120)
@@ -105,12 +107,38 @@ function CharacterBinds:ShowStartDialog()
         button:SetText(label)
         button:SetScript("OnClick", function()
             if ns.BlockedInCombat() then return end
-            dialog:Hide()
             self:Start(loadStartingBinds)
         end)
     end
     AddChoice("Keep current binds", KeepCurrentBinds, -(DIALOG_BUTTON_WIDTH / 2 + 6))
     AddChoice("KeyBar defaults", LoadKeyBarDefaults, DIALOG_BUTTON_WIDTH / 2 + 6)
+end
+
+local function LoadWoWDefaults()
+    LoadBindings(Enum.BindingSet.Default)
+end
+
+CharacterBinds.RESET_OPTIONS = {
+    { name = "KeyBar defaults", load = LoadKeyBarDefaults },
+    { name = "WoW defaults", load = LoadWoWDefaults },
+}
+
+StaticPopupDialogs.KEYBAR_RESET_BINDS = {
+    text = "Reset %s's keybinds to %s?\n\nThis replaces every keybind on this character and can't be undone.",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function(_, option)
+        if ns.BlockedInCombat() then return end
+        CharacterBinds:Start(option.load)
+    end,
+    showAlert = true,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
+function CharacterBinds:ConfirmReset(option)
+    StaticPopup_Show("KEYBAR_RESET_BINDS", UnitName("player"), option.name, option)
 end
 
 EventUtil.RegisterOnceFrameEventAndCallback("VARIABLES_LOADED", function()

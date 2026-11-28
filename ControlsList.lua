@@ -3,6 +3,8 @@ local _, ns = ...
 local PANEL_WIDTH = 280
 local ROW_HEIGHT = 20
 local ICON_SIZE = 16
+local CLOSE_BUTTON_SIZE = 22
+local CANCEL_BUTTON_WIDTH = 60
 -- Opaque enough to read text on, whatever the skin's own background.
 local LIST_BACKGROUND_ALPHA = 0.85
 local TITLE = "Game Controls"
@@ -103,9 +105,20 @@ function ControlsList:Panel()
     end)
     panel:SetScript("OnHide", function() self:SetTargetKey(nil) end)
 
+    panel.Close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
+    panel.Close:SetSize(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
+    panel.Close:SetPoint("TOPRIGHT", -2, -2)
+
+    panel.Cancel = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    panel.Cancel:SetSize(CANCEL_BUTTON_WIDTH, 18)
+    panel.Cancel:SetPoint("RIGHT", panel.Close, "LEFT", -2, 0)
+    panel.Cancel:SetText(CANCEL)
+    panel.Cancel:SetScript("OnClick", function() self:SetTargetKey(nil) end)
+    panel.Cancel:Hide()
+
     panel.Title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     panel.Title:SetPoint("TOPLEFT", 10, -6)
-    panel.Title:SetPoint("RIGHT", -10, 0)
+    panel.Title:SetPoint("RIGHT", panel.Cancel, "LEFT", -4, 0)
     panel.Title:SetJustifyH("LEFT")
     panel.Title:SetText(TITLE)
 
@@ -172,6 +185,7 @@ end
 
 function ControlsList:SetTargetKey(key)
     self.targetKey = key
+    self.panel.Cancel:SetShown(key ~= nil)
     self.panel.Title:SetText(key and ("Binding |cffffffff%s|r"):format(GetBindingText(key)) or TITLE)
 end
 
