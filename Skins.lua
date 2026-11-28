@@ -46,6 +46,7 @@ local SKINS = {
             label = { 0.68, 0.7, 0.74 },
         },
         buttonArt = false,
+        monochromeIcons = true,
     },
 
     -- The game tooltip look: rounded grey edge on near-black.
@@ -69,6 +70,7 @@ local SKINS = {
             label = { 0.85, 0.85, 0.85 },
         },
         buttonArt = true,
+        monochromeIcons = true,
     },
 
     -- Blizzard's dialog frame, tinted gold.

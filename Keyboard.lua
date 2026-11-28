@@ -10,6 +10,10 @@ local CORNER_BUTTON_SIZE = 20
 -- Blizzard's lock art sits inside a wide transparent margin; cropping it lets the padlock fill its button.
 local LOCK_TEXCOORDS = { 0.15, 0.85, 0.15, 0.85 }
 local CORNER_BUTTON_GAP = 4
+local CORNER_ICON_INSET = 3
+local UNLOCKED_GLOW_SCALE = 1.9
+local UNLOCKED_GLOW_PULSE_SECONDS = 0.8
+local WHITE_COLOR = { 1, 1, 1 }
 local CORNER_FADE_PER_SECOND = 5
 local LOCKED_BUTTON_ALPHA = 0.35
 
@@ -132,10 +136,15 @@ local function KeyHeight(def, rowY)
     return 1
 end
 
+-- Each corner button is a small keycap-styled chip so it takes on the active skin.
 local function CreateCornerButton(parent, texture, tooltip)
-    local button = CreateFrame("Button", nil, parent)
+    local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
     button:SetSize(CORNER_BUTTON_SIZE, CORNER_BUTTON_SIZE)
     button:SetNormalTexture(texture)
+    local icon = button:GetNormalTexture()
+    icon:ClearAllPoints()
+    icon:SetPoint("TOPLEFT", CORNER_ICON_INSET, -CORNER_ICON_INSET)
+    icon:SetPoint("BOTTOMRIGHT", -CORNER_ICON_INSET, CORNER_ICON_INSET)
     button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -146,38 +155,58 @@ local function CreateCornerButton(parent, texture, tooltip)
     return button
 end
 
+-- A slow pulsing glow marks the unlocked state, the one where clicks and drags change the board.
+local function CreateUnlockedGlow(button)
+    local glow = button:CreateTexture(nil, "OVERLAY")
+    glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+    glow:SetBlendMode("ADD")
+    glow:SetSize(CORNER_BUTTON_SIZE * UNLOCKED_GLOW_SCALE, CORNER_BUTTON_SIZE * UNLOCKED_GLOW_SCALE)
+    glow:SetPoint("CENTER")
+
+    glow.Pulse = glow:CreateAnimationGroup()
+    glow.Pulse:SetLooping("BOUNCE")
+    local fade = glow.Pulse:CreateAnimation("Alpha")
+    fade:SetFromAlpha(1)
+    fade:SetToAlpha(0.3)
+    fade:SetDuration(UNLOCKED_GLOW_PULSE_SECONDS)
+    fade:SetSmoothing("IN_OUT")
+    return glow
+end
+
 local function LockedTooltip(action)
     return function()
         return ns.db.locked and ("Locked: unlock to " .. action) or action:gsub("^%l", string.upper)
     end
 end
 
--- Move, scale, lock, game controls and settings icons that fade in while the mouse is over the keyboard, like Details! does.
+-- Move, scale, game controls, settings and lock icons that fade in while the mouse is over the keyboard, like Details! does.
+-- The lock sits last, at the outer edge, so it stays clear of the board while it is always shown.
 function Keyboard:CreateCornerControls()
     local corner = CreateFrame("Frame", nil, self)
     corner:SetSize(5 * CORNER_BUTTON_SIZE + 4 * CORNER_BUTTON_GAP, CORNER_BUTTON_SIZE)
     corner:SetFrameLevel(self:GetFrameLevel() + 20)
     corner:SetAlpha(0)
 
+    -- Parented to the keyboard rather than the fading corner, so the board's state shows without hovering it.
+    corner.Lock = CreateCornerButton(self, "Interface\\Buttons\\LockButton-Unlocked-Up",
+        function() return ns.db.locked and "Unlock keys and position" or "Lock keys and position" end)
+    corner.Lock:SetFrameLevel(corner:GetFrameLevel())
+    corner.Lock:SetScript("OnClick", function() self:SetLocked(not ns.db.locked) end)
+    corner.Lock:SetPoint("RIGHT", corner)
+    corner.Lock.Glow = CreateUnlockedGlow(corner.Lock)
+
     corner.Settings = CreateCornerButton(corner, "Interface\\Buttons\\UI-OptionsButton", function() return "Settings" end)
     corner.Settings:SetScript("OnClick", function(button) ns.OpenMenu(button) end)
-    corner.Settings:SetPoint("RIGHT")
+    corner.Settings:SetPoint("RIGHT", corner.Lock, "LEFT", -CORNER_BUTTON_GAP, 0)
 
     corner.Controls = CreateCornerButton(corner, "Interface\\Icons\\INV_Misc_Book_09", function() return "Game controls" end)
     corner.Controls:SetScript("OnClick", function() ns.ControlsList:SetShown(not ns.ControlsList:IsShown()) end)
     corner.Controls:SetPoint("RIGHT", corner.Settings, "LEFT", -CORNER_BUTTON_GAP, 0)
 
-    -- Parented to the keyboard rather than the fading corner, so it can stay visible while locked.
-    corner.Lock = CreateCornerButton(self, "Interface\\Buttons\\LockButton-Unlocked-Up",
-        function() return ns.db.locked and "Unlock keys and position" or "Lock keys and position" end)
-    corner.Lock:SetFrameLevel(corner:GetFrameLevel())
-    corner.Lock:SetScript("OnClick", function() self:SetLocked(not ns.db.locked) end)
-    corner.Lock:SetPoint("RIGHT", corner.Controls, "LEFT", -CORNER_BUTTON_GAP, 0)
-
     corner.Scale = CreateCornerButton(corner, "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up", LockedTooltip("drag left or right to scale"))
     corner.Scale:SetScript("OnMouseDown", function() self:BeginScaling() end)
     corner.Scale:SetScript("OnMouseUp", function() self:EndScaling() end)
-    corner.Scale:SetPoint("RIGHT", corner.Lock, "LEFT", -CORNER_BUTTON_GAP, 0)
+    corner.Scale:SetPoint("RIGHT", corner.Controls, "LEFT", -CORNER_BUTTON_GAP, 0)
 
     corner.Move = CreateCornerButton(corner, "Interface\\Cursor\\UI-Cursor-Move", LockedTooltip("drag to move"))
     corner.Move:SetScript("OnMouseDown", function() self:BeginMoving() end)
@@ -190,9 +219,9 @@ function Keyboard:CreateCornerControls()
         if alpha == target then return end
         local step = elapsed * CORNER_FADE_PER_SECOND
         frame:SetAlpha(target > alpha and math.min(target, alpha + step) or math.max(target, alpha - step))
-        self:UpdateLockAlpha()
     end)
 
+    corner.Buttons = { corner.Move, corner.Scale, corner.Controls, corner.Settings, corner.Lock }
     self.Corner = corner
     self:UpdateLockButton()
 end
@@ -203,20 +232,17 @@ function Keyboard:SetLocked(locked)
     self:UpdateClickActions()
 end
 
--- Move and scale dim while locked so it's clear they're inactive.
+-- Move and scale dim while locked so it's clear they're inactive; unlocked, the padlock glows.
 function Keyboard:UpdateLockButton()
+    local lock = self.Corner.Lock
     local state = ns.db.locked and "Locked" or "Unlocked"
-    self.Corner.Lock:SetNormalTexture("Interface\\Buttons\\LockButton-" .. state .. "-Up")
-    self.Corner.Lock:GetNormalTexture():SetTexCoord(unpack(LOCK_TEXCOORDS))
+    lock:GetNormalTexture():SetTexture("Interface\\Buttons\\LockButton-" .. state .. "-Up")
+    lock:GetNormalTexture():SetTexCoord(unpack(LOCK_TEXCOORDS))
+    lock.Glow:SetShown(not ns.db.locked)
+    lock.Glow.Pulse:SetPlaying(not ns.db.locked)
     local alpha = ns.db.locked and LOCKED_BUTTON_ALPHA or 1
     self.Corner.Move:SetAlpha(alpha)
     self.Corner.Scale:SetAlpha(alpha)
-    self:UpdateLockAlpha()
-end
-
--- Locked, the padlock always shows so it's clear why keys can't be dragged; unlocked, it fades with the corner.
-function Keyboard:UpdateLockAlpha()
-    self.Corner.Lock:SetAlpha(ns.db.locked and 1 or self.Corner:GetAlpha())
 end
 
 -- The move icon can sit outside the frame (title bar hidden), where StartMoving snaps the frame to the
@@ -299,13 +325,22 @@ function Keyboard:ApplySkin()
     self.Title:SetPoint("TOPLEFT", padding, -(padding - 2))
     self.Board:ClearAllPoints()
     self.Board:SetPoint("TOPLEFT", padding, -self.boardTop)
-    -- In the title row when there is one; otherwise just above the frame so no key is covered.
+    -- In the title row when there is one; otherwise docked on the top border, clear of the keys.
     self.Corner:ClearAllPoints()
     if ns.db.showTitle then
         self.Corner:SetPoint("TOPRIGHT", -padding, -(padding - 4))
     else
-        self.Corner:SetPoint("BOTTOMRIGHT", self, "TOPRIGHT", -padding, 2)
+        self.Corner:SetPoint("RIGHT", self, "TOPRIGHT", -padding, 0)
     end
+    for _, button in ipairs(self.Corner.Buttons) do
+        button:SetBackdrop(skin.key.backdrop)
+        button:SetBackdropColor(unpack(skin.key.background))
+        button:SetBackdropBorderColor(unpack(skin.key.border))
+        local icon = button:GetNormalTexture()
+        icon:SetDesaturated(skin.monochromeIcons)
+        icon:SetVertexColor(unpack(skin.monochromeIcons and skin.key.label or WHITE_COLOR))
+    end
+    self.Corner.Lock.Glow:SetVertexColor(unpack(skin.key.pressed))
     for _, cap in ipairs(self.caps) do
         cap:ApplySkin(skin)
     end
